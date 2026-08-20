@@ -17,7 +17,7 @@ Repositorio oficial de la computadora de vuelo para el vehículo aeroespacial **
 ---
 
 ## 📂 Contenido del Repositorio
-1. **[`src/Artemis_Flight_Computer.cpp`](src/Artemis_Flight_Computer.ino):** Código fuente principal optimizado, no bloqueante y documentado para la evaluación de los jueces.
+1. **[`src/Artemis_Flight_Computer.ino`](src/Artemis_Flight_Computer.ino):** Código fuente principal optimizado, no bloqueante y documentado para la evaluación de los jueces.
 2. **[`docs/Diagrama_Conexiones.md`](docs/Diagrama_Conexiones.md):** Mapa detallado de conexiones eléctricas y aislamiento de potencia.
 3. **[`docs/Tabla_Consumo_Bateria.md`](docs/Tabla_Consumo_Bateria.md):** Registro de rendimiento energético y autonomía de la LiPo.
-4. **[`bom/Bill_Of_Materials.md`](bom/Bill_Of_Materials.md):** Lista completa de materiales y costos del proyecto.
+4. **[`bom/Bill_Of_Materials.md`](bom/Bill_Of_Materials.md):** Lista completa de materiales y costos del proyecto. (en proceso)

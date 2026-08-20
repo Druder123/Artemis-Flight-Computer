@@ -1,3 +1,5 @@
+<img width="1191" height="846" alt="SCH_Schematic1_1-P1_2026-08-19" src="https://github.com/user-attachments/assets/86e36fee-642e-4909-894f-fdab4c702a75" />
+
 # 🔌 Diagrama Esquemático y Conexiones Eléctricas
 
 Para proteger la aviónica y evitar reinicios por caídas de tensión, el sistema separa físicamente el bus de potencia (5V) del bus lógico (3.3V).

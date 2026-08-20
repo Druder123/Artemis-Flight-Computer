@@ -4,11 +4,10 @@
  * @details Sistema multietapa hidropropulsado. 
  * Microcontrolador: ESP32 Heltec LoRa V4 (SX1262 a 915 MHz).
  * 
- * ARQUITECTURA DE SOFTWARE :
- * 1. Máquina de Estados Finitos (FSM) simplificada (Separación propulsiva mecánica).
- * 2. Despliegue de carga útil (Autogiro) por detección de apogeo (Barómetro).
- * 3. Transmisión asíncrona de telemetría y sentencias NMEA (Raw Data).
- * 4. Sistema bidireccional de comandos de redundancia y recuperación.
+ * ARQUITECTURA DE SOFTWARE (Para Evaluación de Jueces):
+ * 1. Máquina de Estados Finitos (FSM) basada en altitud.
+ * 2. Despliegue de carga útil (Autogiro) por detección de apogeo.
+ * 3. Transmisión asíncrona de telemetría, sentencias NMEA y Sensor Hall.
  */
 
 #include <Wire.h>
@@ -25,8 +24,12 @@
 #define LORA_NRST  12
 #define LORA_BUSY  13
 
+#define PIN_SDA           4   // I2C Data para BME280 y MPU6050
+#define PIN_SCL           5   // I2C Clock para BME280 y MPU6050
+
 #define PIN_SERVO_CARGA   18  // PWM: Servo para liberar la carga (Autogiro)
 #define PIN_BUZZER        19  // Digital: Alarma acústica para recuperación
+#define PIN_HALL          6   // Digital: Sensor Efecto Hall (ej. conteo de giro)
 #define PIN_LIPO          3   // ADC: Divisor de tensión para LiPo 2S
 #define GPS_RX            16  // UART RX
 #define GPS_TX            17  // UART TX
@@ -46,9 +49,14 @@ float altitudBase = 0.0;
 float altitudMaxima = 0.0;
 float voltajeLiPo = 0.0;
 
+// Variables para el Sensor Hall (Conteo de pulsos / Rotaciones)
+volatile unsigned long contadorHall = 0;
+unsigned long pulsosHallUltimo = 0;
+bool estadoHallAnterior = HIGH;
+
 unsigned long ultimoEnvioLORA = 0;
 const unsigned long INTERVALO_TELEMETRIA = 100; // 10Hz
-bool transmitirTelemetria = true; // Controlado por CMD_START_TLM / CMD_STOP_TLM
+bool transmitirTelemetria = true; 
 
 String nmeaBuffer = ""; 
 
@@ -58,7 +66,9 @@ String nmeaBuffer = "";
 void setup() {
   Serial.begin(115200);
   Serial1.begin(9600, SERIAL_8N1, GPS_RX, GPS_TX);
-  Wire.begin(); 
+  
+  // Inicialización explícita del bus I2C
+  Wire.begin(PIN_SDA, PIN_SCL); 
 
   if (radio.begin(915.0, 125.0, 9, 7, 18, 10, 8, 1.6) != RADIOLIB_ERR_NONE) {
     Serial.println("[ERR] Fallo crítico en LoRa.");
@@ -67,7 +77,7 @@ void setup() {
   bme.begin(0x76);
   mpu.begin();
 
-  // Calibración inicial
+  // Calibración barométrica inicial
   float sumaAltitud = 0;
   for(int i=0; i<10; i++) {
     sumaAltitud += bme.readAltitude(1013.25);
@@ -75,9 +85,11 @@ void setup() {
   }
   altitudBase = sumaAltitud / 10.0;
 
-  // Configuración de Actuadores
+  // Configuración de Periféricos y Actuadores
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW); 
+
+  pinMode(PIN_HALL, INPUT_PULLUP); // Habilitar resistencia pull-up interna para el sensor Hall
 
   ESP32PWM::allocateTimer(0);
   servoCarga.setPeriodHertz(50);
@@ -127,7 +139,6 @@ void actualizarMaquinaEstados(float altitudRelativa) {
       break;
     
     case ASCENSO:
-      // DETECCIÓN DE APOGEO (Caída de 2 metros desde el máximo)
       if (altitudRelativa < (altitudMaxima - 2.0)) {
         servoCarga.write(90); // Liberar autogiro
         estadoActual = APOGEO;
@@ -135,17 +146,24 @@ void actualizarMaquinaEstados(float altitudRelativa) {
       break;
 
     case APOGEO:
-      // Retardo o comprobación adicional antes de declarar descenso libre
       estadoActual = DESCENSO;
       break;
 
     case DESCENSO:
-      // Posible activación automática de buzzer a baja altura
       if (altitudRelativa < 10.0) {
         digitalWrite(PIN_BUZZER, HIGH);
       }
       break;
   }
+}
+
+void leerSensorHall() {
+  // Detección por flanco de bajada (cuando pasa un imán frente al sensor Hall A3144)
+  bool estadoHallActual = digitalRead(PIN_HALL);
+  if (estadoHallAnterior == HIGH && estadoHallActual == LOW) {
+    contadorHall++;
+  }
+  estadoHallAnterior = estadoHallActual;
 }
 
 void rutearDatosGPS() {
@@ -168,7 +186,8 @@ void loop() {
   unsigned long tiempoActual = millis();
   
   rutearDatosGPS();
-  procesarComandosTerrena(); // Escuchar a tierra constantemente
+  procesarComandosTerrena(); 
+  leerSensorHall(); // Monitoreo constante del sensor magnético
 
   if (tiempoActual - ultimoEnvioLORA >= INTERVALO_TELEMETRIA) {
     ultimoEnvioLORA = tiempoActual;
@@ -179,17 +198,18 @@ void loop() {
     mpu.getEvent(&a, &g, &temp);
 
     int adcLiPo = analogRead(PIN_LIPO);
-    voltajeLiPo = (adcLiPo * 3.3 / 4095.0) * 3.1; // Actualizar variable global para el PING
+    voltajeLiPo = (adcLiPo * 3.3 / 4095.0) * 3.1; 
 
     actualizarMaquinaEstados(altitudRelativa);
 
     if (transmitirTelemetria) {
-      // CSV: [Tiempo, Estado, Altitud, AcelZ, Voltaje]
+      // CSV ampliado: [Tiempo, Estado, Altitud, AcelZ, Voltaje, PulsosHall]
       String telemetria = String(tiempoActual) + "," +
                           String(estadoActual) + "," +
                           String(altitudRelativa, 2) + "," +
                           String(a.acceleration.z, 2) + "," +
-                          String(voltajeLiPo, 2);
+                          String(voltajeLiPo, 2) + "," +
+                          String(contadorHall);
 
       radio.transmit(telemetria); 
     }

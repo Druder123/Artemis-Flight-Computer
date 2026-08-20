@@ -29,7 +29,7 @@
 
 #define PIN_SERVO_CARGA   18  // PWM: Servo para liberar la carga (Autogiro)
 #define PIN_BUZZER        19  // Digital: Alarma acústica para recuperación
-#define PIN_HALL          6   // Digital: Sensor Efecto Hall (ej. conteo de giro)
+#define PIN_HALL          6   // Digital: Sensor Efecto Hall
 #define PIN_LIPO          3   // ADC: Divisor de tensión para LiPo 2S
 #define GPS_RX            16  // UART RX
 #define GPS_TX            17  // UART TX

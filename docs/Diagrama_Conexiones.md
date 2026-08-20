@@ -9,7 +9,8 @@ Para proteger la aviónica y evitar reinicios por caídas de tensión, el sistem
 
 ## 2. Bus I2C (Sensores a 3.3V)
 * **ESP32 Pin 3.3V** $\rightarrow$ Alimentación para BME280 y MPU-6050.
-* **ESP32 Pines I2C** $\rightarrow$ Conectados en paralelo a los pines `SDA` y `SCL` de ambos sensores.
+* **ESP32 Pin GPIO 4 (SDA)** $\rightarrow$ Conectado al pin `SDA` del BME280 y del MPU-6050 (en paralelo).
+* **ESP32 Pin GPIO 5 (SCL)** $\rightarrow$ Conectado al pin `SCL` del BME280 y del MPU-6050 (en paralelo).
 
 ## 3. Actuadores y Periféricos
 * **Servomotor SG90:** Señal al **GPIO 18**, VCC a 5V (Regulador) y GND común.
